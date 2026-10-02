@@ -38,6 +38,12 @@ export function Home() {
     setText('');
   }
 
+  function handleToggleTask(id: string) {
+  setTasks((prev) =>
+    prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+  );
+}
+
   function renderEmpty() {
     return (
       <View style={styles.emptyContainer}>
@@ -107,8 +113,30 @@ export function Home() {
           <FlatList
             data={tasks}
             keyExtractor={(item) => item.id}
-            renderItem={() => null} // TODO: componente do item da lista
+
+            renderItem={({ item }) => (
+  <View style={styles.taskCard}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      onPress={() => handleToggleTask(item.id)}
+    >
+      {item.done ? (
+        <View style={styles.checkChecked}>
+          <Feather name="check" size={12} color={COLORS.white} />
+        </View>
+      ) : (
+        <View style={styles.checkUnchecked} />
+      )}
+    </TouchableOpacity>
+
+    <Text style={[styles.taskText, item.done && styles.taskTextDone]}>
+      {item.title}
+    </Text>
+  </View>
+)}
             ListEmptyComponent={renderEmpty}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             style={styles.list}
@@ -134,6 +162,9 @@ const COLORS = {
   emptyTitle: '#414141',
   emptySubtitle: '#414141',
   white: '#F2F2F2',
+  card: '#1A1A1A',
+  cardBorder: '#333333',
+  taskDone: '#808080',
 };
 
 const styles = StyleSheet.create({
@@ -232,9 +263,11 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
   },
-  listContent: {
-    flexGrow: 1,
-  },
+listContent: {
+  flexGrow: 1,
+  paddingTop: 12,
+  paddingBottom: 24,
+},
 
   // Estado vazio
   emptyContainer: {
@@ -258,4 +291,43 @@ const styles = StyleSheet.create({
     color: COLORS.emptySubtitle,
     textAlign: 'center',
   },
+
+  // Item da lista
+taskCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: COLORS.card,
+  borderWidth: 1,
+  borderColor: COLORS.cardBorder,
+  borderRadius: 8,
+  padding: 12,
+  marginBottom: 8,
+},
+checkUnchecked: {
+  width: 18,
+  height: 18,
+  borderRadius: 9,
+  borderWidth: 2,
+  borderColor: COLORS.created,
+},
+checkChecked: {
+  width: 18,
+  height: 18,
+  borderRadius: 9,
+  backgroundColor: COLORS.done,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+taskText: {
+  flex: 1,
+  marginLeft: 12,
+  fontSize: 14,
+  lineHeight: 20,
+  color: COLORS.white,
+},
+taskTextDone: {
+  color: COLORS.taskDone,
+  textDecorationLine: 'line-through',
+},
+
 });
