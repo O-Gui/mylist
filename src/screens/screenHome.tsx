@@ -1,43 +1,261 @@
-// screens/screenHome.js
-import React from 'react';
-import { View, Image, StyleSheet, SafeAreaView } from 'react-native';
+import { Feather } from '@expo/vector-icons'; // ícone do botão "+" (ou troque por react-native-vector-icons)
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import {
+  FlatList,
+  Image,
+  Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import ClipboardImg from '../../assets/images/Clipboard.png';
+import LogoImg from '../../assets/images/mylistlogo.png';
 
-export default function ScreenHome() {
-  return (
-    // SafeAreaView garante que o conteúdo não fique escondido atrás da barra de status (bateria, hora)
-    <SafeAreaView style={styles.container}>
-      
-      <View style={styles.content}>
-        {/* Substitua '../assets/logo.png' pelo caminho real de onde você salvou o seu PNG */}
-        <Image 
-          source={require('../assets/logo.png')} 
-          style={styles.logo}
-          resizeMode="contain" // Mantém a proporção da imagem para não achatar nem esticar
-        />
+type Task = {
+  id: string;
+  title: string;
+  done: boolean;
+};
+
+export function Home() {
+  const [text, setText] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  const createdCount = tasks.length;
+  const doneCount = tasks.filter((t) => t.done).length;
+
+  function handleAddTask() {
+    if (!text.trim()) return;
+    setTasks((prev) => [
+      ...prev,
+      { id: String(Date.now()), title: text.trim(), done: false },
+    ]);
+    setText('');
+  }
+
+  function renderEmpty() {
+    return (
+      <View style={styles.emptyContainer}>
+      <Image source={ClipboardImg} style={styles.emptyImage} resizeMode="contain" />
+        <Text style={styles.emptyTitle}>Sua lista ainda está vazia</Text>
+        <Text style={styles.emptySubtitle}>Adicione algo para se organizar</Text>
       </View>
+    );
+  }
 
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.header} />
+
+      <View style={styles.container}>
+        {/* Cabeçalho com a logo */}
+        <View style={styles.header}>
+          <Image source={LogoImg} style={styles.logo} resizeMode="contain" />
+        </View>
+
+        {/* Conteúdo */}
+        <View style={styles.content}>
+          {/* Input + botão (sobrepõe a divisão entre header e body) */}
+          <View style={styles.form}>
+            <TextInput
+              style={[styles.input, isFocused && styles.inputFocused]}
+              placeholder="Adicione algo a sua lista"
+              placeholderTextColor={COLORS.placeholder}
+              value={text}
+              onChangeText={setText}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              onSubmitEditing={handleAddTask}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              style={styles.button}
+              activeOpacity={0.7}
+              onPress={handleAddTask}
+            >
+              <Feather name="plus-circle" size={20} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Contadores */}
+          <View style={styles.counters}>
+            <View style={styles.counterItem}>
+              <Text style={[styles.counterLabel, { color: COLORS.created }]}>
+                Criadas
+              </Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{createdCount}</Text>
+              </View>
+            </View>
+
+            <View style={styles.counterItem}>
+              <Text style={[styles.counterLabel, { color: COLORS.done }]}>
+                Concluídas
+              </Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{doneCount}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Lista */}
+          <FlatList
+            data={tasks}
+            keyExtractor={(item) => item.id}
+            renderItem={() => null} // TODO: componente do item da lista
+            ListEmptyComponent={renderEmpty}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            style={styles.list}
+          />
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
 
+const COLORS = {
+  header: '#1d1d1de1',
+  background: '#0A0A0A',
+  input: '#262626',
+  inputBorder: '#0D0D0D',
+  inputFocus: '#1E6F9F',
+  button: '#1E6F9F',
+  created: '#1ABCBC',
+  done: '#0A9FD6',
+  badge: '#333333',
+  divider: '#333333',
+  placeholder: '#808080',
+  emptyTitle: '#414141',
+  emptySubtitle: '#414141',
+  white: '#F2F2F2',
+};
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1, // Faz o container ocupar 100% do espaço da tela
-    backgroundColor: '#181818', // Aplica a cor de fundo que você pediu
-  },
-  content: {
+  safe: {
     flex: 1,
-    alignItems: 'center', // Centraliza a logo horizontalmente (esquerda/direita)
-    
-    // Se no seu print a logo fica mais para o TOPO:
-    paddingTop: 80, 
-    
-    // Se no seu print a logo fica exatamente no MEIO da tela, 
-    // apague o 'paddingTop' acima e descomente a linha abaixo:
-    // justifyContent: 'center', 
+    backgroundColor: COLORS.header,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  // Header
+  header: {
+    height: 160,
+    backgroundColor: COLORS.header,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: Platform.OS === 'ios' ? 0 : 8,
   },
   logo: {
-    width: 180, // Ajuste a largura de acordo com o tamanho do seu print
-    height: 180, // Ajuste a altura de acordo com o tamanho do seu print
-  }
+    width: 140,
+    height: 32,
+  },
+
+  // Content
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+  },
+
+  // Form (sobe 27px para sobrepor o header)
+  form: {
+    flexDirection: 'row',
+    marginTop: -27,
+  },
+  input: {
+    flex: 1,
+    height: 54,
+    backgroundColor: COLORS.input,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.inputBorder,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: COLORS.white,
+    marginRight: 4,
+  },
+  inputFocused: {
+    borderColor: COLORS.inputFocus,
+  },
+  button: {
+    width: 54,
+    height: 54,
+    borderRadius: 6,
+    backgroundColor: COLORS.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Contadores
+  counters: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 32,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
+  },
+  counterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  counterLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginRight: 8,
+  },
+  badge: {
+    minWidth: 25,
+    height: 19,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    backgroundColor: COLORS.badge,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.white,
+  },
+
+  // Lista
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    flexGrow: 1,
+  },
+
+  // Estado vazio
+  emptyContainer: {
+    alignItems: 'center',
+    paddingTop: 48,
+    paddingHorizontal: 20,
+  },
+  emptyImage: {
+    width: 56,
+    height: 56,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.emptyTitle,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: COLORS.emptySubtitle,
+    textAlign: 'center',
+  },
 });
