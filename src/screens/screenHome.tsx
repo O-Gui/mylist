@@ -1,25 +1,129 @@
 import { Feather } from '@expo/vector-icons'; // ícone do botão "+" (ou troque por react-native-vector-icons)
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   Image,
+  LayoutAnimation,
+  PanResponder,
   Platform,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
 import ClipboardImg from '../../assets/images/Clipboard.png';
 import LogoImg from '../../assets/images/mylistlogo.png';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Task = {
   id: string;
   title: string;
   done: boolean;
 };
+
+const DELETE_THRESHOLD = 0.4; // 40% da largura do card
+
+type TaskItemProps = {
+  item: Task;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+};
+
+function TaskItem({ item, onToggle, onDelete }: TaskItemProps) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const widthRef = useRef(0);
+
+  function resetPosition() {
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  }
+
+  const panResponder = useRef(
+    PanResponder.create({
+      // só assume o gesto se o movimento for mais horizontal que vertical
+      onMoveShouldSetPanResponderCapture: (_, g) =>
+        Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderTerminationRequest: () => false,
+
+      // acompanha o dedo, só para a esquerda
+      onPanResponderMove: (_, g) => {
+        translateX.setValue(Math.min(0, g.dx));
+      },
+
+      onPanResponderRelease: (_, g) => {
+        const width = widthRef.current;
+        if (-g.dx > width * DELETE_THRESHOLD) {
+          // passou de 40%: sai da tela e depois remove da lista
+          Animated.timing(translateX, {
+            toValue: -width,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => onDelete(item.id));
+        } else {
+          resetPosition();
+        }
+      },
+
+      onPanResponderTerminate: resetPosition,
+    })
+  ).current;
+
+  return (
+    <View
+      style={styles.taskWrapper}
+      onLayout={(e) => (widthRef.current = e.nativeEvent.layout.width)}
+    >
+    {/* Barra vermelha que fica por baixo (só aparece ao arrastar) */}
+<Animated.View
+  style={[
+    styles.deleteBackground,
+    {
+      opacity: translateX.interpolate({
+        inputRange: [-20, 0],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+      }),
+    },
+  ]}
+>
+  <Feather name="trash-2" size={20} color={COLORS.white} />
+</Animated.View>
+      {/* Card que desliza por cima */}
+      <Animated.View
+        style={[styles.taskCard, { transform: [{ translateX }] }]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => onToggle(item.id)}
+        >
+          {item.done ? (
+            <View style={styles.checkChecked}>
+              <Feather name="check" size={12} color={COLORS.white} />
+            </View>
+          ) : (
+            <View style={styles.checkUnchecked} />
+          )}
+        </TouchableOpacity>
+
+        <Text style={[styles.taskText, item.done && styles.taskTextDone]}>
+          {item.title}
+        </Text>
+      </Animated.View>
+    </View>
+  );
+}
 
 export function Home() {
   const [text, setText] = useState('');
@@ -28,6 +132,11 @@ export function Home() {
 
   const createdCount = tasks.length;
   const doneCount = tasks.filter((t) => t.done).length;
+
+  const sortedTasks = [
+  ...tasks.filter((t) => !t.done), // pendentes primeiro, na ordem de criação
+  ...tasks.filter((t) => t.done),  // concluídas no final
+];
 
   function handleAddTask() {
     if (!text.trim()) return;
@@ -39,11 +148,16 @@ export function Home() {
   }
 
   function handleToggleTask(id: string) {
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   setTasks((prev) =>
     prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
   );
 }
-
+function handleDeleteTask(id: string) {
+  // anima as outras tarefas subindo para ocupar o espaço
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  setTasks((prev) => prev.filter((t) => t.id !== id));
+}
   function renderEmpty() {
     return (
       <View style={styles.emptyContainer}>
@@ -111,29 +225,15 @@ export function Home() {
 
           {/* Lista */}
           <FlatList
-            data={tasks}
+            data={sortedTasks}
             keyExtractor={(item) => item.id}
 
             renderItem={({ item }) => (
-  <View style={styles.taskCard}>
-    <TouchableOpacity
-      activeOpacity={0.7}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      onPress={() => handleToggleTask(item.id)}
-    >
-      {item.done ? (
-        <View style={styles.checkChecked}>
-          <Feather name="check" size={12} color={COLORS.white} />
-        </View>
-      ) : (
-        <View style={styles.checkUnchecked} />
-      )}
-    </TouchableOpacity>
-
-    <Text style={[styles.taskText, item.done && styles.taskTextDone]}>
-      {item.title}
-    </Text>
-  </View>
+  <TaskItem
+    item={item}
+    onToggle={handleToggleTask}
+    onDelete={handleDeleteTask}
+  />
 )}
             ListEmptyComponent={renderEmpty}
             keyboardShouldPersistTaps="handled"
@@ -165,6 +265,7 @@ const COLORS = {
   card: '#1A1A1A',
   cardBorder: '#333333',
   taskDone: '#808080',
+  danger: '#C13B3B',
 };
 
 const styles = StyleSheet.create({
@@ -269,6 +370,21 @@ listContent: {
   paddingBottom: 24,
 },
 
+taskWrapper: {
+  marginBottom: 8,
+},
+deleteBackground: {
+  position: 'absolute',
+  top: 0,
+  bottom: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: COLORS.danger,
+  borderRadius: 8,
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  paddingRight: 24,
+},
   // Estado vazio
   emptyContainer: {
     alignItems: 'center',
@@ -301,7 +417,7 @@ taskCard: {
   borderColor: COLORS.cardBorder,
   borderRadius: 8,
   padding: 12,
-  marginBottom: 8,
+  
 },
 checkUnchecked: {
   width: 18,
@@ -329,5 +445,6 @@ taskTextDone: {
   color: COLORS.taskDone,
   textDecorationLine: 'line-through',
 },
+
 
 });
