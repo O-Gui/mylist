@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'; // ícone do botão "+" (ou troque por react-native-vector-icons)
+import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRef, useState } from 'react';
 import {
